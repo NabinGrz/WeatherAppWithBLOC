@@ -22,7 +22,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String? currentLocation;
-  getCurrent() async {
+  bool isLoaded = false;
+  getCurrentLocation() async {
     LocationPermission permission = await Geolocator.checkPermission();
     bool servicestatus = await Geolocator.isLocationServiceEnabled();
     if (servicestatus) {
@@ -34,10 +35,11 @@ class _HomePageState extends State<HomePage> {
       } else {
         Position position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.high);
+        isLoaded = true;
         var placemarks = await placemarkFromCoordinates(
             position.latitude, position.longitude);
         currentLocation = placemarks[0].locality;
-        print(placemarks);
+        // print(placemarks);
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -51,7 +53,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void initState() {
-    getCurrent();
+    getCurrentLocation();
     super.initState();
   }
 
@@ -163,6 +165,7 @@ class _HomePageState extends State<HomePage> {
                           builder: (context, state) {
                             return IconButton(
                                 onPressed: () async {
+                                  isLoaded = true;
                                   log(state.toString());
                                   if (state is WeatherLoadedState) {
                                     FocusManager.instance.primaryFocus!
@@ -178,7 +181,12 @@ class _HomePageState extends State<HomePage> {
                                     ));
                                   }
                                 },
-                                icon: const Icon(Icons.location_on));
+                                icon: !isLoaded
+                                    ? const SizedBox(
+                                        height: 22,
+                                        width: 22,
+                                        child: CircularProgressIndicator())
+                                    : const Icon(Icons.location_on));
                           },
                         ),
                       ],
@@ -208,28 +216,33 @@ class _HomePageState extends State<HomePage> {
                                 borderRadius: BorderRadius.circular(15)),
                           )),
                       onPressed: () async {
-                        BlocProvider.of<WeatherBloc>(context)
-                            .add(WeatherFetchEvent(cityController.text));
-                        log(state.toString());
-                        if (state is WeatherLoadedState) {
-                          FocusManager.instance.primaryFocus!.unfocus();
-                          Navigator.push(context, CupertinoPageRoute(
-                            builder: (context) {
-                              return BlocProvider(
-                                create: (context) => WeatherBloc(),
-                                child: WeatherDetail(weather: state.weather),
-                              );
-                            },
-                          ));
-                        } else if (state is WeatherNotFoundState) {
-                          Navigator.push(context, CupertinoPageRoute(
-                            builder: (context) {
-                              return BlocProvider(
-                                create: (context) => WeatherBloc(),
-                                child: WeatherDetail(weather: null),
-                              );
-                            },
-                          ));
+                        if (cityController.text.isNotEmpty) {
+                          BlocProvider.of<WeatherBloc>(context)
+                              .add(WeatherFetchEvent(cityController.text));
+                          log(state.toString());
+                          if (state is WeatherLoadedState) {
+                            FocusManager.instance.primaryFocus!.unfocus();
+                            Navigator.push(context, CupertinoPageRoute(
+                              builder: (context) {
+                                return BlocProvider(
+                                  create: (context) => WeatherBloc(),
+                                  child: WeatherDetail(weather: state.weather),
+                                );
+                              },
+                            ));
+                          } else if (state is WeatherNotFoundState) {
+                            Navigator.push(context, CupertinoPageRoute(
+                              builder: (context) {
+                                return BlocProvider(
+                                  create: (context) => WeatherBloc(),
+                                  child: WeatherDetail(weather: null),
+                                );
+                              },
+                            ));
+                          }
+                        } else {
+                          BlocProvider.of<WeatherBloc>(context).add(
+                              WeatherTextChangedEvent(cityController.text));
                         }
                       },
                       child: const Text(
